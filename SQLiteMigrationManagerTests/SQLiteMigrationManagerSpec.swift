@@ -6,7 +6,7 @@ import SQLite
 struct TestMigration: Migration {
   let version: Int64
 
-  func migrateDatabase(db: Connection) { }
+  func migrateDatabase(_ db: Connection) { }
 }
 
 struct TestDB {
@@ -17,7 +17,7 @@ struct TestDB {
 struct CreateTable: Migration {
   let version: Int64
 
-  func migrateDatabase(db: Connection) throws {
+  func migrateDatabase(_ db: Connection) throws {
     try db.run(TestDB.table.create { t in
       t.column(TestDB.column)
     })
@@ -27,7 +27,7 @@ struct CreateTable: Migration {
 struct AddRow: Migration {
   let version: Int64
 
-  func migrateDatabase(db: Connection) throws {
+  func migrateDatabase(_ db: Connection) throws {
     try db.run(TestDB.table.insert(TestDB.column <- Int(version)))
   }
 }
@@ -35,7 +35,7 @@ struct AddRow: Migration {
 struct Throwing: Migration {
   let version: Int64
 
-  func migrateDatabase(db: Connection) throws {
+  func migrateDatabase(_ db: Connection) throws {
     throw Result.Error(message: "Test error", code: 0, statement: nil)
   }
 }
@@ -53,7 +53,7 @@ class SQLiteMigrationManagerSpec: QuickSpec {
 
       subject = SQLiteMigrationManager(db: db)
 
-      testBundle = NSBundle(forClass: self.dynamicType)
+      testBundle = NSBundle(forClass: type(of: self))
     }
 
     describe("hasMigrationsTable()") {
@@ -460,11 +460,11 @@ class SQLiteMigrationManagerSpec: QuickSpec {
   }
 }
 
-private func createMigrationTable(db: Connection) {
+private func createMigrationTable(_ db: Connection) {
   try! db.execute("CREATE TABLE schema_migrations(version INTEGER UNIQUE NOT NULL);")
 }
 
-private func insertMigration(db: Connection, version: Int64) {
+private func insertMigration(_ db: Connection, version: Int64) {
   let stmt = try! db.prepare("INSERT INTO schema_migrations(version) VALUES (?);")
   try! stmt.run(version)
 }

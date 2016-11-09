@@ -9,7 +9,7 @@ private struct MigrationDB {
 /// Interface for managing migrations for a SQLite database accessed via `SQLite.swift`.
 public struct SQLiteMigrationManager {
   /// The `SQLite.swift` database `Connection`.
-  private let db: Connection
+  fileprivate let db: Connection
 
   /// All migrations discovered by the receiver.
   public let migrations: [Migration]
@@ -22,7 +22,7 @@ public struct SQLiteMigrationManager {
      - migrations: An array of `Migration`. Defaults to `[]`.
      - bundle: An `NSBundle` containing SQL migrations. Defaults to `nil`.
    */
-  public init(db: Connection, migrations: [Migration] = [], bundle: NSBundle? = nil) {
+  public init(db: Connection, migrations: [Migration] = [], bundle: Bundle? = nil) {
     self.db = db
     self.migrations = [
       bundle?.migrations() ?? [],
@@ -38,7 +38,7 @@ public struct SQLiteMigrationManager {
      - migrations: An array of `Migration`. Defaults to `[]`.
      - bundle: An `NSBundle` containing SQL migrations. Defaults to `nil`.
    */
-  public init?(url: NSURL, migrations: [Migration] = [], bundle: NSBundle? = nil) {
+  public init?(url: URL, migrations: [Migration] = [], bundle: Bundle? = nil) {
     do {
       let db = try Connection(url.absoluteString)
       self.init(db: db, migrations: migrations, bundle: bundle)
@@ -55,8 +55,8 @@ public struct SQLiteMigrationManager {
      - migrations: An array of `Migration`. Defaults to `[]`.
      - bundle: An `NSBundle` containing SQL migrations. Defaults to `nil`.
    */
-  public init?(path: String, migrations: [Migration] = [], bundle: NSBundle? = nil) {
-    if let url = NSURL(string: path) {
+  public init?(path: String, migrations: [Migration] = [], bundle: Bundle? = nil) {
+    if let url = URL(string: path) {
       self.init(url: url, migrations: migrations, bundle: bundle)
     }
     return nil
@@ -152,7 +152,7 @@ public struct SQLiteMigrationManager {
    - parameters:
      - toVersion: The target version to migrate the database to. Defaults to `Int64.max`.
    */
-  public func migrateDatabase(toVersion toVersion: Int64 = Int64.max) throws {
+  public func migrateDatabase(toVersion: Int64 = Int64.max) throws {
     try pendingMigrations().filter { $0.version <= toVersion }.forEach { migration in
       try db.transaction {
         try migration.migrateDatabase(self.db)
@@ -162,9 +162,9 @@ public struct SQLiteMigrationManager {
   }
 }
 
-extension NSBundle {
-  private func migrations() -> [Migration] {
-    if let urls = URLsForResourcesWithExtension("sql", subdirectory: nil) {
+extension Bundle {
+  fileprivate func migrations() -> [Migration] {
+    if let urls = urls(forResourcesWithExtension: "sql", subdirectory: nil) {
       return urls.flatMap { FileMigration(url: $0) }
     } else {
       return []
@@ -178,7 +178,7 @@ public protocol Migration: CustomStringConvertible {
   var version: Int64 { get }
 
   /// Tells the receiver to apply its changes to the given database.
-  func migrateDatabase(db: Connection) throws
+  func migrateDatabase(_ db: Connection) throws
 }
 
 public extension Migration {
@@ -192,11 +192,11 @@ public struct FileMigration: Migration {
   /// The numeric version of the migration.
   public let version: Int64
   /// The `NSURL` of the migration file.
-  public let url: NSURL
+  public let url: URL
 
   /// Tells the receiver to apply its changes to the given database.
-  public func migrateDatabase(db: Connection) throws {
-    let fileContents = try NSString(contentsOfURL: url, encoding: NSUTF8StringEncoding)
+  public func migrateDatabase(_ db: Connection) throws {
+    let fileContents = try NSString(contentsOf: url, encoding: String.Encoding.utf8.rawValue)
     try db.execute(fileContents as String)
   }
 }
@@ -213,7 +213,7 @@ extension FileMigration {
 
    - returns: A file migration if the filename matches `^(\d+)_?([\w\s-]*)\.sql$`.
    */
-  public init?(url: NSURL) {
+  public init?(url: URL) {
     guard let filename = url.lastPathComponent else {
       return nil
     }
@@ -227,11 +227,11 @@ extension FileMigration {
 }
 
 extension FileMigration {
-  static private let regex = try! NSRegularExpression(pattern: "^(\\d+)_?([\\w\\s-]*)\\.sql$", options: .CaseInsensitive)
+  static fileprivate let regex = try! NSRegularExpression(pattern: "^(\\d+)_?([\\w\\s-]*)\\.sql$", options: .caseInsensitive)
 
-  static private func extractVersion(filename: String) -> Int64? {
-    if let result = regex.firstMatchInString(filename, options: .ReportProgress, range: NSMakeRange(0, filename.startIndex.distanceTo(filename.endIndex))) where result.numberOfRanges == 3 {
-      return Int64((filename as NSString).substringWithRange(result.rangeAtIndex(1)))
+  static fileprivate func extractVersion(_ filename: String) -> Int64? {
+    if let result = regex.firstMatch(in: filename, options: .reportProgress, range: NSMakeRange(0, filename.characters.distance(from: filename.startIndex, to: filename.endIndex))) , result.numberOfRanges == 3 {
+      return Int64((filename as NSString).substring(with: result.rangeAt(1)))
     }
     return nil
   }
