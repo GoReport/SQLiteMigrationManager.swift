@@ -27,7 +27,7 @@ public struct SQLiteMigrationManager {
     self.migrations = [
       bundle?.migrations() ?? [],
       migrations
-    ].flatten().sort { $0.version < $1.version }
+    ].joined().sorted { $0.version < $1.version }
   }
 
   /**
@@ -70,7 +70,14 @@ public struct SQLiteMigrationManager {
     let type = Expression<String>("type")
     let name = Expression<String>("name")
 
-    return db.scalar(sqliteMaster.filter(type == "table" && name == "schema_migrations").count) == 1;
+    let hasTable: Bool
+    do {
+        hasTable = try db.scalar(sqliteMaster.filter(type == "table" && name == "schema_migrations").count) == 1
+    } catch {
+        hasTable = false
+    }
+
+    return hasTable
   }
 
   /**
@@ -85,23 +92,23 @@ public struct SQLiteMigrationManager {
   /**
    The current version of the database managed by the receiver or `0` if the migrations table is not present or empty.
    */
-  public func currentVersion() -> Int64 {
-    if !hasMigrationsTable() {
+  public func currentVersion() throws -> Int64 {
+    if !hasMigrationsTable()  {
       return 0
     }
 
-    return db.scalar(MigrationDB.table.select(MigrationDB.version.max)) ?? 0
+    return try db.scalar(MigrationDB.table.select(MigrationDB.version.max)) ?? 0
   }
 
   /**
    The origin version of the database managed by the receiver or `0` if the migrations table is not present or empty.
    */
-  public func originVersion() -> Int64 {
+  public func originVersion() throws -> Int64 {
     if !hasMigrationsTable() {
       return 0
     }
 
-    return db.scalar(MigrationDB.table.select(MigrationDB.version.min)) ?? 0
+    return try db.scalar(MigrationDB.table.select(MigrationDB.version.min)) ?? 0
   }
 
   /**
@@ -214,10 +221,7 @@ extension FileMigration {
    - returns: A file migration if the filename matches `^(\d+)_?([\w\s-]*)\.sql$`.
    */
   public init?(url: URL) {
-    guard let filename = url.lastPathComponent else {
-      return nil
-    }
-    guard let version = FileMigration.extractVersion(filename) else {
+    guard let version = FileMigration.extractVersion(url.lastPathComponent) else {
       return nil
     }
 
